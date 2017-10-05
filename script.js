@@ -9,9 +9,9 @@ class Vec
 
 class Rect
 {
-	constructor(w, h)
+	constructor(w, h, x, y)
 	{
-		this.pos = new Vec;
+		this.pos = new Vec(x, y);
 		this.size = new Vec(w, h);
 	}
 }
@@ -41,6 +41,14 @@ class Game
 		this.player.vel.x = 200;
 
 		this.keyEvent = keyEvent;
+
+		this.ships = [];
+		this.countForShips = 0;
+		this.frequency = 30;
+		this.countShips = 5;
+		this.speedShips = 50;
+
+		this.shots = [];
 
 
 		let lastTime;
@@ -72,6 +80,75 @@ class Game
 							this.player.size_2.x, this.player.size_2.y);
 		this._context.fillRect(this.player.pos.x+23, this.player.pos.y-10, 
 							this.player.size_3.x, this.player.size_3.y);
+
+		this.collision();
+		this.shotsGeneration(dt);
+		this.shipsGeneration(dt);
+	}
+
+	shipsGeneration(dt) {
+
+		if( this.countForShips > this.frequency && this.ships.length < this.countShips) {
+
+		    this.ships.push(new Rect(10, 10, Math.random() * 590|0, 0));
+		    this.countForShips = 0;
+
+		}
+		this.countForShips++;
+
+		for(let i = 0; i < this.ships.length; i++) {
+			let ship = this.ships[i];
+		    if(this._canvas.height > ship.pos.y) {
+		    	ship.pos.y += this.speedShips * dt;
+		    }
+		    else {
+		    	this.ships[i] = new Rect(10, 10, Math.random() * 590|0, 0);
+		    }
+
+		    this._context.fillStyle = "rgb(22, 105, 67)";
+		    this._context.fillRect(ship.pos.x, ship.pos.y, ship.size.x, ship.size.y);
+		}
+	}
+
+	shotsGeneration(dt) {
+
+	  if(this.keyEvent.space) {
+	    let length = this.shots.length;
+	    if(length > 0) {
+	      if((this.shots[length-1].pos.y + 7) < 380) {
+	        this.shots.push(new Rect(5, 5, this.player.pos.x+23, 380));
+	      }
+	    } else {
+	      this.shots.push(new Rect(5, 5, this.player.pos.x+23, 380));
+	    }
+
+	  }
+
+	  for(let i = 0; i < this.shots.length; i++) {
+	  	let shot = this.shots[i];
+	  	this._context.fillStyle = "rgb(173, 105, 82)";
+		this._context.fillRect(shot.pos.x, shot.pos.y, shot.size.x, shot.size.y);
+		shot.pos.y -= 200 * dt;
+	  }
+	}
+
+	collision() {
+	  for(let i = 0; i < this.shots.length; i++) {
+	    for(let j = 0; j < this.ships.length; j++) {
+		  let shot = this.shots[i];
+		  let ship = this.ships[j];	
+	      if(shot.pos.y < ship.pos.y+10 && shot.pos.x+5 > ship.pos.x && shot.pos.x < ship.pos.x+10) {
+	        this.ships.splice(j, 1);
+	        this.shots.splice(i, 1);
+	        break;
+	      }
+	    }
+	  }
+	  for(let i = 0; i < this.shots.length; i++) {
+	      if(this.shots[i].pos.y < 0) {
+	        this.shots.splice(i, 1);
+	    }
+	  }
 	}
 }
 
