@@ -1,154 +1,136 @@
-class Vec
+class Game
 {
-	constructor(x = 0, y = 0)
-	{
-		this.x = x;
-		this.y = y;
+	constructor(canvas) {
+		this.canvas = canvas;
+		this.ctx = canvas.getContext('2d');
+		this.world = new Set();
+		this._last = 0;
+		this.count = 0;
+		this.world.add(new Player(this.canvas.width/2-30, this.canvas.height-30, 30, 20, "rgb(173, 105, 82)", 200));
+		this.world.add(new Attack(50));
+		this.lastObjShot = false;
+		this._step = (now) => {
+			this._loop = requestAnimationFrame(this._step);
+			this.delta = Math.min(now - this._last, 100) / 1000;
+			this._last = now;
+			this.update();
+			this.render();
+		};
+		this._step(0);
+	}
+
+	update() {
+		for (let entity of this.world) if (entity.update) entity.update(this);
+	}
+
+	render() {
+		this.ctx.fillStyle = "rgb(36, 177, 219)";
+		this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+		for (let entity of this.world) if (entity.render) entity.render(this);
+	}
+
+	collide(entity1, type) {
+		for (let entity2 of this.world) {
+			if (entity1 != entity2  &&
+				entity1.x <= entity2.x + entity2.w &&
+				entity1.x + entity1.w >= entity2.x &&
+				entity1.y <= entity2.y + entity2.h &&
+				entity1.h + entity1.y >= entity2.y) 
+				{
+					if(entity1.type == (SHOT || SHIP) && entity2.type == (SHIP || SHOT))
+					{
+						this.world.delete(entity1);
+						this.world.delete(entity2);
+					}
+					if(entity1.type == PLAYER && entity2.type == SHIP)
+					{
+						this.stop();
+					}
+				}	
+		}
+	}
+
+	stop() {
+		if (this._loop) this._loop = cancelAnimationFrame(this._loop);
 	}
 }
 
 class Rect
 {
-	constructor(w, h, x, y)
-	{
-		this.pos = new Vec(x, y);
-		this.size = new Vec(w, h);
+	constructor() {
+	}
+
+	render(game) {
+		game.ctx.fillStyle = this.color;
+		game.ctx.fillRect(this.x, this.y, this.w, this.h);
 	}
 }
 
-class Player
+const PLAYER = 1, SHIP = 2, SHOT = 4, LINE = 8;
+
+class Player extends Rect
 {
-	constructor()
-	{
-		this.size_1 = new Vec(50, 5);
-		this.size_2 = new Vec(30, 5);
-		this.size_3 = new Vec(5, 5);
-		this.vel = new Vec;
-		this.pos = new Vec;
+	constructor(px, py, pw, ph, c, v, game) {
+		super();
+		Object.assign(this, { type: PLAYER, rate: 0.1, delay: 0, x : px, y : py, w : pw, h : ph, color : c, vel : v });
+	}
+
+	update(game) {
+
+		if(keyEvent.left) {
+			this.x -= this.vel * game.delta;
+		}
+		if(keyEvent.right) {
+			this.x += this.vel * game.delta;
+		}
+		this.delay -= game.delta;
+		if (keyEvent.space && this.delay < 0) {
+			this.delay = this.rate;
+			game.world.add(new Shot(this.x+11, this.y-8, 7, 7, 'red', 200));
+		}
+		game.collide(this);
 	}
 }
 
-class Game
+class Ship extends Rect
 {
-	constructor(canvas, keyEvent)
-	{
-		this._canvas = canvas;
-		this._context = canvas.getContext("2d");
-
-		this.player = new Player;
-		this.player.pos.x = 180;
-		this.player.pos.y = 395;
-		this.player.vel.x = 200;
-
-		this.keyEvent = keyEvent;
-
-		this.ships = [];
-		this.countForShips = 0;
-		this.frequency = 30;
-		this.countShips = 5;
-		this.speedShips = 50;
-
-		this.shots = [];
-
-
-		let lastTime;
-		const callback = (millis) => {
-			if(lastTime) {
-				this.update((millis - lastTime) / 1000);
-			}
-			lastTime = millis;
-			requestAnimationFrame(callback);
-		};
-		callback();
-	}
-	update(dt) {
-
-		if(this.keyEvent.left) {
-			this.player.pos.x -= this.player.vel.x * dt;
-		}
-		if(this.keyEvent.right) {
-			this.player.pos.x += this.player.vel.x * dt;
-		}
-
-		this._context.fillStyle = "rgb(36, 177, 219)";
-		this._context.fillRect(0, 0, this._canvas.width, this._canvas.height);
-
-		this._context.fillStyle = "rgb(173, 105, 82)";
-		this._context.fillRect(this.player.pos.x, this.player.pos.y, 
-							this.player.size_1.x, this.player.size_1.y);
-		this._context.fillRect(this.player.pos.x+10, this.player.pos.y-5, 
-							this.player.size_2.x, this.player.size_2.y);
-		this._context.fillRect(this.player.pos.x+23, this.player.pos.y-10, 
-							this.player.size_3.x, this.player.size_3.y);
-
-		this.collision();
-		this.shotsGeneration(dt);
-		this.shipsGeneration(dt);
+	constructor(px, py, pw, ph, c, v, game) {
+		super();
+		Object.assign(this, { type: SHIP, x : px, y : py, w : pw, h : ph, color : c, vel : v });
+		game.ship = this;
 	}
 
-	shipsGeneration(dt) {
+	update(game) {
+		this.y += this.vel * game.delta;
+		game.collide(this);
+	}
+}
 
-		if( this.countForShips > this.frequency && this.ships.length < this.countShips) {
-
-		    this.ships.push(new Rect(10, 10, Math.random() * 590|0, 0));
-		    this.countForShips = 0;
-
-		}
-		this.countForShips++;
-
-		for(let i = 0; i < this.ships.length; i++) {
-			let ship = this.ships[i];
-		    if(this._canvas.height > ship.pos.y) {
-		    	ship.pos.y += this.speedShips * dt;
-		    }
-		    else {
-		    	this.ships[i] = new Rect(10, 10, Math.random() * 590|0, 0);
-		    }
-
-		    this._context.fillStyle = "rgb(22, 105, 67)";
-		    this._context.fillRect(ship.pos.x, ship.pos.y, ship.size.x, ship.size.y);
-		}
+class Shot extends Rect
+{
+	constructor(px, py, pw, ph, c, v) {
+		super();
+		Object.assign(this, { type: SHOT, x : px, y : py, w : pw, h : ph, color : c, vel : v });
 	}
 
-	shotsGeneration(dt) {
-
-	  if(this.keyEvent.space) {
-	    let length = this.shots.length;
-	    if(length > 0) {
-	      if((this.shots[length-1].pos.y + 7) < 380) {
-	        this.shots.push(new Rect(5, 5, this.player.pos.x+23, 380));
-	      }
-	    } else {
-	      this.shots.push(new Rect(5, 5, this.player.pos.x+23, 380));
-	    }
-
-	  }
-
-	  for(let i = 0; i < this.shots.length; i++) {
-	  	let shot = this.shots[i];
-	  	this._context.fillStyle = "rgb(173, 105, 82)";
-		this._context.fillRect(shot.pos.x, shot.pos.y, shot.size.x, shot.size.y);
-		shot.pos.y -= 200 * dt;
-	  }
+	update(game) {
+		this.y -= this.vel * game.delta;
+		game.collide(this);
+		if(this.y < 0) game.world.delete(this);
 	}
+}
 
-	collision() {
-	  for(let i = 0; i < this.shots.length; i++) {
-	    for(let j = 0; j < this.ships.length; j++) {
-		  let shot = this.shots[i];
-		  let ship = this.ships[j];	
-	      if(shot.pos.y < ship.pos.y+10 && shot.pos.x+5 > ship.pos.x && shot.pos.x < ship.pos.x+10) {
-	        this.ships.splice(j, 1);
-	        this.shots.splice(i, 1);
-	        break;
-	      }
-	    }
-	  }
-	  for(let i = 0; i < this.shots.length; i++) {
-	      if(this.shots[i].pos.y < 0) {
-	        this.shots.splice(i, 1);
-	    }
-	  }
+class Attack {
+	constructor(s) {
+		Object.assign(this, { size: s, rate: 0.5, delay: 0 });
+	}
+	update(game) {
+		this.delay -= game.delta;
+		if (this.delay < 0) {
+			this.delay = this.rate;
+			game.world.add(new Ship(Math.random() * 590, 5, 10, 10, 'green', 100, game));
+			if (!--this.size) game.world.delete(this);
+		}
 	}
 }
 
@@ -174,8 +156,4 @@ window.onkeyup = function(e) {
   }
 };
 
-const canvas = document.getElementById("canvas");
-
-const game = new Game(canvas, keyEvent);
-
-
+const game = new Game(document.getElementById('canvas'));
